@@ -1,0 +1,53 @@
+{
+  "Version": 1,
+  "WorkspaceRootPath": "D:\\FlaskAdminPortal\\",
+  "Documents": [
+    {
+      "AbsoluteMoniker": "D:0:0:{DD04DC0D-752D-4C79-B7D6-5B2ED7349382}|FlaskAdminPortal\\FlaskAdminPortal.csproj|d:\\flaskadminportal\\flaskadminportal\\pages\\paragraphs.cshtml.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{DD04DC0D-752D-4C79-B7D6-5B2ED7349382}|FlaskAdminPortal\\FlaskAdminPortal.csproj|solutionrelative:flaskadminportal\\pages\\paragraphs.cshtml.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{DD04DC0D-752D-4C79-B7D6-5B2ED7349382}|FlaskAdminPortal\\FlaskAdminPortal.csproj|d:\\flaskadminportal\\flaskadminportal\\pages\\paragraphs.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}",
+      "RelativeMoniker": "D:0:0:{DD04DC0D-752D-4C79-B7D6-5B2ED7349382}|FlaskAdminPortal\\FlaskAdminPortal.csproj|solutionrelative:flaskadminportal\\pages\\paragraphs.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}"
+    }
+  ],
+  "DocumentGroupContainers": [
+    {
+      "Orientation": 0,
+      "VerticalTabListWidth": 256,
+      "DocumentGroups": [
+        {
+          "DockedWidth": 200,
+          "SelectedChildIndex": 0,
+          "Children": [
+            {
+              "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "Paragraphs.cshtml.cs",
+              "DocumentMoniker": "D:\\FlaskAdminPortal\\FlaskAdminPortal\\Pages\\Paragraphs.cshtml.cs",
+              "RelativeDocumentMoniker": "FlaskAdminPortal\\Pages\\Paragraphs.cshtml.cs",
+              "ToolTip": "D:\\FlaskAdminPortal\\FlaskAdminPortal\\Pages\\Paragraphs.cshtml.cs",
+              "RelativeToolTip": "FlaskAdminPortal\\Pages\\Paragraphs.cshtml.cs",
+              "ViewState": "AgIAAAMAAAAAAAAAAAAAACEAAAARAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-07-09T05:32:06.821Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
+              "Title": "Paragraphs.cshtml",
+              "DocumentMoniker": "D:\\FlaskAdminPortal\\FlaskAdminPortal\\Pages\\Paragraphs.cshtml",
+              "RelativeDocumentMoniker": "FlaskAdminPortal\\Pages\\Paragraphs.cshtml",
+              "ToolTip": "D:\\FlaskAdminPortal\\FlaskAdminPortal\\Pages\\Paragraphs.cshtml",
+              "RelativeToolTip": "FlaskAdminPortal\\Pages\\Paragraphs.cshtml",
+              "ViewState": "AgIAADIAAAAAAAAAAAAuwEUAAAA1AAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000759|",
+              "WhenOpened": "2025-07-09T02:49:39.145Z"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

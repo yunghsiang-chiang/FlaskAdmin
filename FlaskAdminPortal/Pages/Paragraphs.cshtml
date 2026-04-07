@@ -1,0 +1,173 @@
+﻿@page
+@model FlaskAdminPortal.Pages.ParagraphsModel
+@{
+    ViewData["Title"] = "段落列表";
+}
+
+<h2>段落列表（共 @Model.TotalItems 筆）</h2>
+
+@if (!string.IsNullOrEmpty(Model.ErrorMessage))
+{
+    <div class="alert alert-danger">@Model.ErrorMessage</div>
+}
+else if (Model.Paragraphs.Count == 0)
+{
+    <div class="alert alert-info">尚無資料。</div>
+}
+else
+{
+    <!-- 🔺 每頁筆數選單 -->
+    <form method="get" class="form-inline mb-3">
+        <label for="pageSize" class="mr-2">每頁筆數：</label>
+        <select name="pageSize" id="pageSize" class="form-control mr-2" onchange="this.form.submit()">
+            @if (Model.pageSize == 25)
+            {
+                <option value="25" selected>25</option>
+            }
+            else
+            {
+                <option value="25">25</option>
+            }
+
+            @if (Model.pageSize == 50)
+            {
+                <option value="50" selected>50</option>
+            }
+            else
+            {
+                <option value="50">50</option>
+            }
+
+            @if (Model.pageSize == 100)
+            {
+                <option value="100" selected>100</option>
+            }
+            else
+            {
+                <option value="100">100</option>
+            }
+        </select>
+
+        <input type="hidden" name="currentPage" value="@Model.currentPage" />
+    </form>
+
+    <!-- 🔺 分頁條 -->
+    <form method="get" class="form-inline mt-2">
+        <label for="pageJump" class="mr-2">跳至頁碼：</label>
+        <select id="pageJump" name="currentPage" class="form-control" onchange="this.form.submit()">
+            @for (int i = 1; i <= Model.TotalPages; i++)
+            {
+                <option value="@i" selected="@(i == Model.currentPage ? "selected" : null)">第 @i 頁</option>
+            }
+        </select>
+        <input type="hidden" name="pageSize" value="@Model.pageSize" />
+    </form>
+
+    <div id="reload-status" class="my-2"></div>
+
+    <form method="post" asp-page-handler="Reload">
+        <button type="submit" class="btn btn-warning btn-sm">🔁 Reload Now</button>
+        @if (!string.IsNullOrEmpty(Model.ReloadStatus))
+        {
+            <div class="mt-2">
+                <span class="@(Model.ReloadStatus.StartsWith("✅") ? "text-success" : "text-danger")">
+                    @Model.ReloadStatus
+                </span>
+            </div>
+        }
+    </form>
+
+
+    <!-- 資料表格 -->
+    <table class="table table-bordered table-striped">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>內容</th>
+                <th>操作</th>
+            </tr>
+        </thead>
+        @*         <tbody>
+            @foreach (var p in Model.Paragraphs)
+            {
+                <tr>
+                    <td>@p.Id</td>
+                    <td>@p.Text</td>
+                </tr>
+            }
+        </tbody> *@
+        <tbody>
+            @foreach (var p in Model.Paragraphs) // 請將 ParagraphList 換成你實際使用的 ViewModel
+            {
+                <tr id="row-@p.Id">
+                    <td>@p.Id</td>
+                    <td>
+                        <span class="text-display" id="text-display-@p.Id">@p.Text</span>
+                        <input type="text" class="form-control text-edit d-none" id="text-edit-@p.Id" value="@p.Text" />
+                    </td>
+                    <td>
+                        <button class="btn btn-sm btn-primary" onclick="editText(@p.Id, event)">Edit</button>
+                        <button class="btn btn-sm btn-success d-none" onclick="submitText(@p.Id, event)">Submit</button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+
+    </table>
+
+    <script>
+        function editText(id,event) {
+            document.getElementById(`text-display-${id}`).classList.add('d-none');
+            document.getElementById(`text-edit-${id}`).classList.remove('d-none');
+            event.target.classList.add('d-none'); // 隱藏 Edit
+            event.target.nextElementSibling.classList.remove('d-none'); // 顯示 Submit
+        }
+
+        async function submitText(id,event) {
+            const newText = document.getElementById(`text-edit-${id}`).value;
+            const res = await fetch(`https://dict.hochi.org.tw:5165/api/admin/update/${id}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ text: newText })
+            });
+
+            if (res.ok) {
+                document.getElementById(`text-display-${id}`).innerText = newText;
+                alert("✅ 修改成功！");
+            } else {
+                alert("❌ 修改失敗！");
+            }
+
+            document.getElementById(`text-display-${id}`).classList.remove('d-none');
+            document.getElementById(`text-edit-${id}`).classList.add('d-none');
+            event.target.classList.add('d-none'); // 隱藏 Submit
+            event.target.previousElementSibling.classList.remove('d-none'); // 顯示 Edit
+
+            await updateReloadStatus(); // 重新檢查 reload-needed 狀態
+        }
+
+        async function updateReloadStatus() {
+            try {
+                const res = await fetch("https://dict.hochi.org.tw:5165/api/admin/reload-needed");
+                const json = await res.json();
+
+                const statusDiv = document.getElementById("reload-status");
+                if (json.reload_needed) {
+                    statusDiv.innerHTML = '<span class="text-danger fw-bold">⚠️ 需要重新啟動伺服器服務</span>';
+                } else {
+                    statusDiv.innerHTML = '<span class="text-muted">✅ 不需重新啟動</span>';
+                }
+            } catch (err) {
+                console.error("Failed to fetch reload-needed:", err);
+                document.getElementById("reload-status").innerHTML =
+                    '<span class="text-danger">❌ 無法取得伺服器狀態</span>';
+            }
+        }
+
+        // 初始載入狀態
+        document.addEventListener("DOMContentLoaded", updateReloadStatus);
+    </script>
+
+}

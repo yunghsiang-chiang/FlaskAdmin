@@ -1,0 +1,11 @@
+D:\FlaskAdminPortal\FlaskAdminPortal\obj\Release\net8.0\PubTmp\Out\FlaskAdminPortal.exe
+D:\FlaskAdminPortal\FlaskAdminPortal\obj\Release\net8.0\PubTmp\Out\appsettings.Development.json
+D:\FlaskAdminPortal\FlaskAdminPortal\obj\Release\net8.0\PubTmp\Out\appsettings.json
+D:\FlaskAdminPortal\FlaskAdminPortal\obj\Release\net8.0\PubTmp\Out\FlaskAdminPortal.dll
+D:\FlaskAdminPortal\FlaskAdminPortal\obj\Release\net8.0\PubTmp\Out\FlaskAdminPortal.deps.json
+D:\FlaskAdminPortal\FlaskAdminPortal\obj\Release\net8.0\PubTmp\Out\FlaskAdminPortal.runtimeconfig.json
+D:\FlaskAdminPortal\FlaskAdminPortal\obj\Release\net8.0\PubTmp\Out\FlaskAdminPortal.pdb
+D:\FlaskAdminPortal\FlaskAdminPortal\obj\Release\net8.0\PubTmp\Out\Microsoft.Extensions.DependencyInjection.Abstractions.dll
+D:\FlaskAdminPortal\FlaskAdminPortal\obj\Release\net8.0\PubTmp\Out\Microsoft.Extensions.Logging.Abstractions.dll
+D:\FlaskAdminPortal\FlaskAdminPortal\obj\Release\net8.0\PubTmp\Out\Microsoft.Extensions.Options.dll
+D:\FlaskAdminPortal\FlaskAdminPortal\obj\Release\net8.0\PubTmp\Out\Newtonsoft.Json.dll
