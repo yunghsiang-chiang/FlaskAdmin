@@ -9,6 +9,15 @@ namespace FlaskAdminPortal.Pages
 {
     public class ParagraphsModel : PageModel
     {
+        private readonly IHttpClientFactory _httpClientFactory;
+        private readonly IConfiguration _configuration;
+
+        public ParagraphsModel(IHttpClientFactory httpClientFactory, IConfiguration configuration)
+        {
+            _httpClientFactory = httpClientFactory;
+            _configuration = configuration;
+        }
+
         [BindProperty(SupportsGet = true)]
         public int currentPage { get; set; } = 1;
 
@@ -22,9 +31,10 @@ namespace FlaskAdminPortal.Pages
         {
             try
             {
-                using var client = new HttpClient();
-                var res = await client.PostAsync("https://dict.hochi.org.tw:5165/api/admin/reload", null);
+                var client = _httpClientFactory.CreateClient();
+                var res = await client.PostAsync($"{GetAdminApiBaseUrl()}/reload", null);
                 var content = await res.Content.ReadAsStringAsync();
+                var (code, message) = ParseErrorBody(content);
 
                 if (res.IsSuccessStatusCode)
                 {
@@ -32,7 +42,7 @@ namespace FlaskAdminPortal.Pages
                 }
                 else
                 {
-                    ReloadStatus = $"❌ 重新載入失敗：{content}";
+                    ReloadStatus = $"❌ 重新載入失敗（HTTP {(int)res.StatusCode} / {code ?? "UNKNOWN"}）：{message}";
                 }
             }
             catch (Exception ex)
@@ -64,23 +74,30 @@ namespace FlaskAdminPortal.Pages
                 LogDebug($"🌐 DEBUG: Page = {currentPage}, PageSize = {pageSize}");
                 Paragraphs.Clear(); // 清空前一頁的資料
 
-                var url = $"https://dict.hochi.org.tw:5165/api/admin/paragraphs?page={currentPage}&pageSize={pageSize}";
-                LogDebug($"https://dict.hochi.org.tw:5165/api/admin/paragraphs?page={currentPage}&pageSize={pageSize}");
-                using var client = new HttpClient();
+                var url = $"{GetAdminApiBaseUrl()}/paragraphs?page={currentPage}&pageSize={pageSize}";
+                LogDebug(url);
+                var client = _httpClientFactory.CreateClient();
                 var response = await client.GetAsync(url);
-                response.EnsureSuccessStatusCode();
-
                 var responseBody = await response.Content.ReadAsStringAsync();
-                var json = JObject.Parse(responseBody);
-
-                var paragraphsJson = json["paragraphs"] as JObject;
-                foreach (var prop in paragraphsJson.Properties())
+                if (!response.IsSuccessStatusCode)
                 {
-                    Paragraphs.Add(new ParagraphInfo
+                    var (code, message) = ParseErrorBody(responseBody);
+                    ErrorMessage = $"錯誤：無法取得段落資料（HTTP {(int)response.StatusCode} / {code ?? "UNKNOWN"}）：{message}";
+                    return Page();
+                }
+
+                var json = JObject.Parse(responseBody);
+                var paragraphsJson = json["paragraphs"] as JObject;
+                if (paragraphsJson != null)
+                {
+                    foreach (var prop in paragraphsJson.Properties())
                     {
-                        Id = prop.Name,
-                        Text = prop.Value?.ToString()
-                    });
+                        Paragraphs.Add(new ParagraphInfo
+                        {
+                            Id = prop.Name,
+                            Text = prop.Value?.ToString()
+                        });
+                    }
                 }
 
                 TotalItems = json["total"]?.Value<int>() ?? 0;
@@ -97,6 +114,32 @@ namespace FlaskAdminPortal.Pages
         {
             var path = Path.Combine(Directory.GetCurrentDirectory(), "log.txt");
             System.IO.File.AppendAllText(path, $"[{DateTime.Now}] {message}\n");
+        }
+
+        private string GetAdminApiBaseUrl()
+            => _configuration["AdminApi:BaseUrl"]?.TrimEnd('/') ?? "https://dict.hochi.org.tw:5165/api/admin";
+
+        private static (string? code, string message) ParseErrorBody(string body)
+        {
+            if (string.IsNullOrWhiteSpace(body))
+            {
+                return (null, "上游服務未回傳內容");
+            }
+
+            try
+            {
+                var json = JObject.Parse(body);
+                var code = json["code"]?.ToString();
+                var message = json["message"]?.ToString()
+                    ?? json["error"]?.ToString()
+                    ?? json["detail"]?.ToString()
+                    ?? body;
+                return (code, message);
+            }
+            catch
+            {
+                return (null, body);
+            }
         }
 
     }

@@ -116,6 +116,25 @@ else
     </table>
 
     <script>
+        const adminApiBase = "/api/admin";
+
+        function tryParseJson(text) {
+            try {
+                return JSON.parse(text);
+            } catch {
+                return null;
+            }
+        }
+
+        function extractErrorMessage(payload, fallbackText) {
+            if (!payload) return fallbackText;
+            if (typeof payload === "string") return payload;
+            if (payload.message) return payload.message;
+            if (payload.error) return payload.error;
+            if (payload.detail) return payload.detail;
+            return fallbackText;
+        }
+
         function editText(id,event) {
             document.getElementById(`text-display-${id}`).classList.add('d-none');
             document.getElementById(`text-edit-${id}`).classList.remove('d-none');
@@ -125,7 +144,7 @@ else
 
         async function submitText(id,event) {
             const newText = document.getElementById(`text-edit-${id}`).value;
-            const res = await fetch(`https://dict.hochi.org.tw:5165/api/admin/update/${id}`, {
+            const res = await fetch(`${adminApiBase}/update/${id}`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json'
@@ -133,11 +152,15 @@ else
                 body: JSON.stringify({ text: newText })
             });
 
+            const bodyText = await res.text();
+            const payload = tryParseJson(bodyText);
+
             if (res.ok) {
                 document.getElementById(`text-display-${id}`).innerText = newText;
                 alert("✅ 修改成功！");
             } else {
-                alert("❌ 修改失敗！");
+                const msg = extractErrorMessage(payload, bodyText || "未知錯誤");
+                alert(`❌ 修改失敗（HTTP ${res.status}）：${msg}`);
             }
 
             document.getElementById(`text-display-${id}`).classList.remove('d-none');
@@ -150,11 +173,18 @@ else
 
         async function updateReloadStatus() {
             try {
-                const res = await fetch("https://dict.hochi.org.tw:5165/api/admin/reload-needed");
-                const json = await res.json();
-
+                const res = await fetch(`${adminApiBase}/reload-needed`);
+                const bodyText = await res.text();
+                const json = tryParseJson(bodyText);
                 const statusDiv = document.getElementById("reload-status");
-                if (json.reload_needed) {
+
+                if (!res.ok) {
+                    const msg = extractErrorMessage(json, bodyText || "未知錯誤");
+                    statusDiv.innerHTML = `<span class="text-danger">❌ 無法取得伺服器狀態（HTTP ${res.status}）：${msg}</span>`;
+                    return;
+                }
+
+                if (json?.reload_needed === true) {
                     statusDiv.innerHTML = '<span class="text-danger fw-bold">⚠️ 需要重新啟動伺服器服務</span>';
                 } else {
                     statusDiv.innerHTML = '<span class="text-muted">✅ 不需重新啟動</span>';
