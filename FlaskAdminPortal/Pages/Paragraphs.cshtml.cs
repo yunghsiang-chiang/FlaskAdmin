@@ -155,7 +155,7 @@ namespace FlaskAdminPortal.Pages
             }
 
             SourceFiles = files
-                .Select(x => x?.ToString())
+                .Select(ExtractFileName)
                 .Where(x => !string.IsNullOrWhiteSpace(x))
                 .Select(x => x!)
                 .Distinct(StringComparer.OrdinalIgnoreCase)
@@ -180,12 +180,34 @@ namespace FlaskAdminPortal.Pages
             }
 
             SampledFiles = files
-                .Select(x => x?.ToString())
+                .Select(ExtractFileName)
                 .Where(x => !string.IsNullOrWhiteSpace(x))
                 .Select(x => x!)
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .OrderBy(x => x, StringComparer.OrdinalIgnoreCase)
                 .ToList();
+        }
+
+        private static string? ExtractFileName(JToken? token)
+        {
+            if (token == null)
+            {
+                return null;
+            }
+
+            if (token.Type == JTokenType.String)
+            {
+                return token.ToString();
+            }
+
+            if (token is JObject obj)
+            {
+                return obj["file_name"]?.ToString()
+                    ?? obj["fileName"]?.ToString()
+                    ?? obj["name"]?.ToString();
+            }
+
+            return token.ToString();
         }
 
         private HttpClient CreateAdminClient()
