@@ -146,7 +146,7 @@ namespace FlaskAdminPortal.Pages
             }
 
             var json = JObject.Parse(body);
-            var files = json["source_files"] as JArray;
+            var files = (json["source_files"] ?? json["files"]) as JArray;
             if (files == null)
             {
                 return;
@@ -156,8 +156,8 @@ namespace FlaskAdminPortal.Pages
                 .Select(x => x?.ToString())
                 .Where(x => !string.IsNullOrWhiteSpace(x))
                 .Select(x => x!)
-                .Distinct()
-                .OrderBy(x => x)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(x => x, StringComparer.OrdinalIgnoreCase)
                 .ToList();
         }
 
