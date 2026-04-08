@@ -4,22 +4,22 @@
     ViewData["Title"] = "段落列表";
 }
 
-<h2>段落列表（共 @Model.TotalItems 筆）</h2>
+<h2>段落管理（共 @Model.TotalItems 筆）</h2>
 
-@if (!string.IsNullOrEmpty(Model.ErrorMessage))
-{
-    <div class="alert alert-danger">@Model.ErrorMessage</div>
-}
-else if (Model.Paragraphs.Count == 0)
-{
-    <div class="alert alert-info">尚無資料。</div>
-}
-else
-{
-    <!-- 🔺 每頁筆數選單 -->
-    <form method="get" class="form-inline mb-3">
-        <label for="pageSize" class="mr-2">每頁筆數：</label>
-        <select name="pageSize" id="pageSize" class="form-control mr-2" onchange="this.form.submit()">
+<form method="get" class="row g-2 align-items-end mb-3">
+    <div class="col-md-4">
+        <label for="fileName" class="form-label">檔案名稱篩選</label>
+        <select name="fileName" id="fileName" class="form-select">
+            <option value="">全部檔案</option>
+            @foreach (var sourceFile in Model.SourceFiles)
+            {
+                <option value="@sourceFile" selected="@(sourceFile == Model.fileName ? "selected" : null)">@sourceFile</option>
+            }
+        </select>
+    </div>
+    <div class="col-md-2">
+        <label for="pageSize" class="form-label">每頁筆數</label>
+        <select name="pageSize" id="pageSize" class="form-select">
             @if (Model.pageSize == 25)
             {
                 <option value="25" selected>25</option>
@@ -47,25 +47,37 @@ else
                 <option value="100">100</option>
             }
         </select>
-
-        <input type="hidden" name="currentPage" value="@Model.currentPage" />
-    </form>
-
-    <!-- 🔺 分頁條 -->
-    <form method="get" class="form-inline mt-2">
-        <label for="pageJump" class="mr-2">跳至頁碼：</label>
-        <select id="pageJump" name="currentPage" class="form-control" onchange="this.form.submit()">
-            @for (int i = 1; i <= Model.TotalPages; i++)
+    </div>
+    <div class="col-md-2">
+        <label for="pageJump" class="form-label">頁碼</label>
+        <select id="pageJump" name="currentPage" class="form-select">
+            @for (int i = 1; i <= Math.Max(Model.TotalPages, 1); i++)
             {
                 <option value="@i" selected="@(i == Model.currentPage ? "selected" : null)">第 @i 頁</option>
             }
         </select>
-        <input type="hidden" name="pageSize" value="@Model.pageSize" />
-    </form>
+    </div>
+    <div class="col-md-4">
+        <button type="submit" class="btn btn-primary">套用篩選</button>
+    </div>
+</form>
 
+@if (!string.IsNullOrEmpty(Model.ErrorMessage))
+{
+    <div class="alert alert-danger">@Model.ErrorMessage</div>
+}
+else if (Model.Paragraphs.Count == 0)
+{
+    <div class="alert alert-info">尚無資料。</div>
+}
+else
+{
     <div id="reload-status" class="my-2"></div>
 
-    <form method="post" asp-page-handler="Reload">
+    <form method="post" asp-page-handler="Reload" class="mb-3">
+        <input type="hidden" name="fileName" value="@Model.fileName" />
+        <input type="hidden" name="currentPage" value="@Model.currentPage" />
+        <input type="hidden" name="pageSize" value="@Model.pageSize" />
         <button type="submit" class="btn btn-warning btn-sm">🔁 Reload Now</button>
         @if (!string.IsNullOrEmpty(Model.ReloadStatus))
         {
@@ -77,8 +89,6 @@ else
         }
     </form>
 
-
-    <!-- 資料表格 -->
     <table class="table table-bordered table-striped">
         <thead>
             <tr>
@@ -87,17 +97,8 @@ else
                 <th>操作</th>
             </tr>
         </thead>
-        @*         <tbody>
-            @foreach (var p in Model.Paragraphs)
-            {
-                <tr>
-                    <td>@p.Id</td>
-                    <td>@p.Text</td>
-                </tr>
-            }
-        </tbody> *@
         <tbody>
-            @foreach (var p in Model.Paragraphs) // 請將 ParagraphList 換成你實際使用的 ViewModel
+            @foreach (var p in Model.Paragraphs)
             {
                 <tr id="row-@p.Id">
                     <td>@p.Id</td>
@@ -106,17 +107,29 @@ else
                         <input type="text" class="form-control text-edit d-none" id="text-edit-@p.Id" value="@p.Text" />
                     </td>
                     <td>
-                        <button class="btn btn-sm btn-primary" onclick="editText(@p.Id, event)">Edit</button>
-                        <button class="btn btn-sm btn-success d-none" onclick="submitText(@p.Id, event)">Submit</button>
+                        <button class="btn btn-sm btn-primary" onclick="editText('@p.Id', event)">Edit</button>
+                        <button class="btn btn-sm btn-success d-none" onclick="submitText('@p.Id', event)">Submit</button>
+                        <button class="btn btn-sm btn-danger" onclick="deleteParagraph('@p.Id', event)">Delete</button>
                     </td>
                 </tr>
             }
         </tbody>
-
     </table>
 
     <script>
         const adminApiBase = "/api/admin";
+        const adminApiKey = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.AdminApiKeyForClient));
+
+        function buildHeaders(includeContentType = false) {
+            const headers = {};
+            if (includeContentType) {
+                headers['Content-Type'] = 'application/json';
+            }
+            if (adminApiKey) {
+                headers['X-Admin-API-Key'] = adminApiKey;
+            }
+            return headers;
+        }
 
         function tryParseJson(text) {
             try {
@@ -135,20 +148,20 @@ else
             return fallbackText;
         }
 
-        function editText(id,event) {
+        function editText(id, event) {
+            event.preventDefault();
             document.getElementById(`text-display-${id}`).classList.add('d-none');
             document.getElementById(`text-edit-${id}`).classList.remove('d-none');
-            event.target.classList.add('d-none'); // 隱藏 Edit
-            event.target.nextElementSibling.classList.remove('d-none'); // 顯示 Submit
+            event.target.classList.add('d-none');
+            event.target.nextElementSibling.classList.remove('d-none');
         }
 
-        async function submitText(id,event) {
+        async function submitText(id, event) {
+            event.preventDefault();
             const newText = document.getElementById(`text-edit-${id}`).value;
             const res = await fetch(`${adminApiBase}/update/${id}`, {
                 method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
+                headers: buildHeaders(true),
                 body: JSON.stringify({ text: newText })
             });
 
@@ -165,15 +178,44 @@ else
 
             document.getElementById(`text-display-${id}`).classList.remove('d-none');
             document.getElementById(`text-edit-${id}`).classList.add('d-none');
-            event.target.classList.add('d-none'); // 隱藏 Submit
-            event.target.previousElementSibling.classList.remove('d-none'); // 顯示 Edit
+            event.target.classList.add('d-none');
+            event.target.previousElementSibling.classList.remove('d-none');
 
-            await updateReloadStatus(); // 重新檢查 reload-needed 狀態
+            await updateReloadStatus();
+        }
+
+        async function deleteParagraph(id, event) {
+            event.preventDefault();
+            if (!confirm(`確定要刪除段落 ID ${id} 嗎？`)) {
+                return;
+            }
+
+            const res = await fetch(`${adminApiBase}/delete/${id}`, {
+                method: 'DELETE',
+                headers: buildHeaders(false)
+            });
+
+            const bodyText = await res.text();
+            const payload = tryParseJson(bodyText);
+            if (res.ok) {
+                const row = document.getElementById(`row-${id}`);
+                if (row) {
+                    row.remove();
+                }
+                alert("✅ 刪除成功！");
+            } else {
+                const msg = extractErrorMessage(payload, bodyText || "未知錯誤");
+                alert(`❌ 刪除失敗（HTTP ${res.status}）：${msg}`);
+            }
+
+            await updateReloadStatus();
         }
 
         async function updateReloadStatus() {
             try {
-                const res = await fetch(`${adminApiBase}/reload-needed`);
+                const res = await fetch(`${adminApiBase}/reload-needed`, {
+                    headers: buildHeaders(false)
+                });
                 const bodyText = await res.text();
                 const json = tryParseJson(bodyText);
                 const statusDiv = document.getElementById("reload-status");
@@ -196,8 +238,6 @@ else
             }
         }
 
-        // 初始載入狀態
         document.addEventListener("DOMContentLoaded", updateReloadStatus);
     </script>
-
 }
