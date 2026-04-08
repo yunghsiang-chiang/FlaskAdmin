@@ -37,3 +37,4 @@ D:\FlaskAdminPortal\FlaskAdminPortal\obj\Release\net8.0\refint\FlaskAdminPortal.
 D:\FlaskAdminPortal\FlaskAdminPortal\obj\Release\net8.0\FlaskAdminPortal.pdb
 D:\FlaskAdminPortal\FlaskAdminPortal\obj\Release\net8.0\FlaskAdminPortal.genruntimeconfig.cache
 D:\FlaskAdminPortal\FlaskAdminPortal\obj\Release\net8.0\ref\FlaskAdminPortal.dll
+D:\FlaskAdminPortal\FlaskAdminPortal\obj\Release\net8.0\FlaskAdminPortal.sourcelink.json
