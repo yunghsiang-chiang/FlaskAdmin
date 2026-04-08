@@ -1,9 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Newtonsoft.Json.Linq;
-using System.Net.Http;
-using System.Threading.Tasks;
-using System.Collections.Generic;
 
 namespace FlaskAdminPortal.Pages
 {
@@ -24,14 +21,100 @@ namespace FlaskAdminPortal.Pages
         [BindProperty(SupportsGet = true)]
         public int pageSize { get; set; } = 50;
 
+        [BindProperty(SupportsGet = true)]
+        public string? fileName { get; set; }
+
         [BindProperty]
         public string ReloadStatus { get; set; }
+
+        public class ParagraphInfo
+        {
+            public string Id { get; set; }
+            public string Text { get; set; }
+        }
+
+        public List<ParagraphInfo> Paragraphs { get; set; } = new();
+        public List<string> SourceFiles { get; set; } = new();
+        public string ErrorMessage { get; set; }
+        public string SuccessMessage { get; set; }
+
+        public int TotalItems { get; set; }
+        public int TotalPages => pageSize <= 0 ? 1 : (int)Math.Ceiling((double)TotalItems / pageSize);
+        public string AdminApiKeyForClient => _configuration["AdminApi:ApiKey"] ?? string.Empty;
+
+        public async Task<IActionResult> OnGetAsync()
+        {
+            try
+            {
+                if (currentPage < 1)
+                {
+                    currentPage = 1;
+                }
+
+                if (pageSize <= 0)
+                {
+                    pageSize = 50;
+                }
+
+                Paragraphs.Clear();
+                var client = CreateAdminClient();
+
+                await LoadSourceFilesAsync(client);
+
+                var url = string.IsNullOrWhiteSpace(fileName)
+                    ? $"{GetAdminApiBaseUrl()}/paragraphs?page={currentPage}&pageSize={pageSize}"
+                    : $"{GetAdminApiBaseUrl()}/paragraphs-by-file?fileName={Uri.EscapeDataString(fileName)}";
+
+                var response = await client.GetAsync(url);
+                var responseBody = await response.Content.ReadAsStringAsync();
+                if (!response.IsSuccessStatusCode)
+                {
+                    var (code, message) = ParseErrorBody(responseBody);
+                    ErrorMessage = $"錯誤：無法取得段落資料（HTTP {(int)response.StatusCode} / {code ?? "UNKNOWN"}）：{message}";
+                    return Page();
+                }
+
+                var json = JObject.Parse(responseBody);
+                var paragraphsNode = json["paragraphs"];
+
+                if (paragraphsNode is JObject paragraphsObj)
+                {
+                    foreach (var prop in paragraphsObj.Properties())
+                    {
+                        Paragraphs.Add(new ParagraphInfo
+                        {
+                            Id = prop.Name,
+                            Text = prop.Value?.ToString() ?? string.Empty
+                        });
+                    }
+                }
+                else if (paragraphsNode is JArray paragraphsArray)
+                {
+                    foreach (var item in paragraphsArray.OfType<JObject>())
+                    {
+                        Paragraphs.Add(new ParagraphInfo
+                        {
+                            Id = item["id"]?.ToString() ?? string.Empty,
+                            Text = item["text"]?.ToString() ?? string.Empty
+                        });
+                    }
+                }
+
+                TotalItems = json["total"]?.Value<int>() ?? Paragraphs.Count;
+            }
+            catch (HttpRequestException ex)
+            {
+                ErrorMessage = $"錯誤：無法取得段落資料。{ex.Message}";
+            }
+
+            return Page();
+        }
 
         public async Task<IActionResult> OnPostReloadAsync()
         {
             try
             {
-                var client = _httpClientFactory.CreateClient();
+                var client = CreateAdminClient();
                 var res = await client.PostAsync($"{GetAdminApiBaseUrl()}/reload", null);
                 var content = await res.Content.ReadAsStringAsync();
                 var (code, message) = ParseErrorBody(content);
@@ -50,70 +133,45 @@ namespace FlaskAdminPortal.Pages
                 ReloadStatus = $"❌ 發生錯誤：{ex.Message}";
             }
 
-            return await OnGetAsync(); // Reload 後重新整理段落資料
+            return await OnGetAsync();
         }
 
-
-        public class ParagraphInfo
+        private async Task LoadSourceFilesAsync(HttpClient client)
         {
-            public string Id { get; set; }
-            public string Text { get; set; }
-        }
-
-        public List<ParagraphInfo> Paragraphs { get; set; } = new();
-        public string ErrorMessage { get; set; }
-        public string SuccessMessage { get; set; }
-
-        public int TotalItems { get; set; }
-        public int TotalPages => (int)System.Math.Ceiling((double)TotalItems / pageSize);
-
-        public async Task<IActionResult> OnGetAsync()
-        {
-            try
+            var res = await client.GetAsync($"{GetAdminApiBaseUrl()}/source-files");
+            var body = await res.Content.ReadAsStringAsync();
+            if (!res.IsSuccessStatusCode)
             {
-                LogDebug($"🌐 DEBUG: Page = {currentPage}, PageSize = {pageSize}");
-                Paragraphs.Clear(); // 清空前一頁的資料
-
-                var url = $"{GetAdminApiBaseUrl()}/paragraphs?page={currentPage}&pageSize={pageSize}";
-                LogDebug(url);
-                var client = _httpClientFactory.CreateClient();
-                var response = await client.GetAsync(url);
-                var responseBody = await response.Content.ReadAsStringAsync();
-                if (!response.IsSuccessStatusCode)
-                {
-                    var (code, message) = ParseErrorBody(responseBody);
-                    ErrorMessage = $"錯誤：無法取得段落資料（HTTP {(int)response.StatusCode} / {code ?? "UNKNOWN"}）：{message}";
-                    return Page();
-                }
-
-                var json = JObject.Parse(responseBody);
-                var paragraphsJson = json["paragraphs"] as JObject;
-                if (paragraphsJson != null)
-                {
-                    foreach (var prop in paragraphsJson.Properties())
-                    {
-                        Paragraphs.Add(new ParagraphInfo
-                        {
-                            Id = prop.Name,
-                            Text = prop.Value?.ToString()
-                        });
-                    }
-                }
-
-                TotalItems = json["total"]?.Value<int>() ?? 0;
-            }
-            catch (HttpRequestException ex)
-            {
-                ErrorMessage = $"錯誤：無法取得段落資料。{ex.Message}";
+                return;
             }
 
-            return Page();
+            var json = JObject.Parse(body);
+            var files = json["source_files"] as JArray;
+            if (files == null)
+            {
+                return;
+            }
+
+            SourceFiles = files
+                .Select(x => x?.ToString())
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Select(x => x!)
+                .Distinct()
+                .OrderBy(x => x)
+                .ToList();
         }
 
-        private void LogDebug(string message)
+        private HttpClient CreateAdminClient()
         {
-            var path = Path.Combine(Directory.GetCurrentDirectory(), "log.txt");
-            System.IO.File.AppendAllText(path, $"[{DateTime.Now}] {message}\n");
+            var client = _httpClientFactory.CreateClient();
+            var apiKey = _configuration["AdminApi:ApiKey"];
+            if (!string.IsNullOrWhiteSpace(apiKey))
+            {
+                client.DefaultRequestHeaders.Remove("X-Admin-API-Key");
+                client.DefaultRequestHeaders.Add("X-Admin-API-Key", apiKey);
+            }
+
+            return client;
         }
 
         private string GetAdminApiBaseUrl()
@@ -141,6 +199,5 @@ namespace FlaskAdminPortal.Pages
                 return (null, body);
             }
         }
-
     }
 }
