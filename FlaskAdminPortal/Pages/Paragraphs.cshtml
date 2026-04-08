@@ -72,6 +72,22 @@ else if (Model.Paragraphs.Count == 0)
 }
 else
 {
+    <div class="card mb-3">
+        <div class="card-body">
+            <h5 class="card-title mb-3">已取樣檔案清單管理</h5>
+            <div class="row g-2 align-items-end mb-3">
+                <div class="col-md-6">
+                    <label for="sampled-file-input" class="form-label">新增檔案</label>
+                    <input id="sampled-file-input" type="text" class="form-control" placeholder="請輸入檔名，例如 data.txt" />
+                </div>
+                <div class="col-md-2">
+                    <button type="button" class="btn btn-success" onclick="addSampledFile(event)">新增至取樣清單</button>
+                </div>
+            </div>
+            <ul id="sampled-files-list" class="list-group"></ul>
+        </div>
+    </div>
+
     <div id="reload-status" class="my-2"></div>
 
     <form method="post" asp-page-handler="Reload" class="mb-3">
@@ -119,6 +135,7 @@ else
     <script>
         const adminApiBase = "/api/admin";
         const adminApiKey = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.AdminApiKeyForClient));
+        const sampledFiles = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.SampledFiles));
 
         function buildHeaders(includeContentType = false) {
             const headers = {};
@@ -154,6 +171,96 @@ else
             document.getElementById(`text-edit-${id}`).classList.remove('d-none');
             event.target.classList.add('d-none');
             event.target.nextElementSibling.classList.remove('d-none');
+        }
+
+        function renderSampledFiles() {
+            const listEl = document.getElementById("sampled-files-list");
+            if (!listEl) return;
+
+            listEl.innerHTML = "";
+            if (sampledFiles.length === 0) {
+                listEl.innerHTML = '<li class="list-group-item text-muted" id="sampled-empty-item">目前沒有已取樣檔案</li>';
+                return;
+            }
+
+            sampledFiles.forEach(file => {
+                const li = document.createElement("li");
+                li.className = "list-group-item d-flex justify-content-between align-items-center";
+
+                const text = document.createElement("span");
+                text.innerText = file;
+
+                const btn = document.createElement("button");
+                btn.type = "button";
+                btn.className = "btn btn-sm btn-outline-danger";
+                btn.innerText = "移除";
+                btn.onclick = (event) => removeSampledFile(file, event);
+
+                li.appendChild(text);
+                li.appendChild(btn);
+                listEl.appendChild(li);
+            });
+        }
+
+        async function addSampledFile(event) {
+            event.preventDefault();
+            const input = document.getElementById("sampled-file-input");
+            const fileName = input?.value?.trim();
+            if (!fileName) {
+                alert("請輸入檔名");
+                return;
+            }
+
+            const res = await fetch(`${adminApiBase}/sampled-files`, {
+                method: 'POST',
+                headers: buildHeaders(true),
+                body: JSON.stringify({ fileName })
+            });
+
+            const bodyText = await res.text();
+            const payload = tryParseJson(bodyText);
+            if (!res.ok) {
+                const msg = extractErrorMessage(payload, bodyText || "未知錯誤");
+                alert(`❌ 新增失敗（HTTP ${res.status}）：${msg}`);
+                return;
+            }
+
+            if (!sampledFiles.some(x => x.toLowerCase() === fileName.toLowerCase())) {
+                sampledFiles.push(fileName);
+                sampledFiles.sort((a, b) => a.localeCompare(b, 'zh-Hant', { sensitivity: 'base' }));
+            }
+
+            input.value = "";
+            renderSampledFiles();
+            alert("✅ 已加入取樣清單");
+        }
+
+        async function removeSampledFile(fileName, event) {
+            event.preventDefault();
+            if (!confirm(`確定要將 ${fileName} 從取樣清單移除嗎？`)) {
+                return;
+            }
+
+            const res = await fetch(`${adminApiBase}/sampled-files/${encodeURIComponent(fileName)}`, {
+                method: 'DELETE',
+                headers: buildHeaders(false)
+            });
+
+            const bodyText = await res.text();
+            const payload = tryParseJson(bodyText);
+            if (!res.ok) {
+                const msg = extractErrorMessage(payload, bodyText || "未知錯誤");
+                alert(`❌ 移除失敗（HTTP ${res.status}）：${msg}`);
+                return;
+            }
+
+            const idx = sampledFiles.findIndex(x => x.toLowerCase() === fileName.toLowerCase());
+            if (idx >= 0) {
+                sampledFiles.splice(idx, 1);
+            }
+
+            renderSampledFiles();
+            alert("✅ 已移除取樣檔案");
         }
 
         async function submitText(id, event) {
@@ -238,6 +345,9 @@ else
             }
         }
 
-        document.addEventListener("DOMContentLoaded", updateReloadStatus);
+        document.addEventListener("DOMContentLoaded", () => {
+            renderSampledFiles();
+            updateReloadStatus();
+        });
     </script>
 }
