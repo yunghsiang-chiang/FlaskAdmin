@@ -23,33 +23,53 @@ namespace FlaskAdminPortal.Pages
             try
             {
                 var client = CreateAdminClient();
-                var res = await client.GetAsync($"{GetAdminApiBaseUrl()}/sampled-files");
-                var body = await res.Content.ReadAsStringAsync();
-                if (!res.IsSuccessStatusCode)
-                {
-                    ErrorMessage = $"錯誤：無法取得取樣檔案清單（HTTP {(int)res.StatusCode}）。";
-                    return;
-                }
 
-                var json = JObject.Parse(body);
-                var files = (json["sampled_files"] ?? json["files"]) as JArray;
-                if (files == null)
+                SampledFiles = await LoadFilesAsync(client, "sampled-files", "sampled_files");
+
+                if (!string.IsNullOrEmpty(ErrorMessage))
                 {
                     return;
                 }
 
-                SampledFiles = files
-                    .Select(ExtractFileName)
-                    .Where(x => !string.IsNullOrWhiteSpace(x))
-                    .Select(x => x!)
-                    .Distinct(StringComparer.OrdinalIgnoreCase)
-                    .OrderBy(x => x, StringComparer.OrdinalIgnoreCase)
-                    .ToList();
+                if (SampledFiles.Count == 0)
+                {
+                    SampledFiles = await LoadFilesAsync(client, "source-files", "source_files");
+                }
             }
             catch (HttpRequestException ex)
             {
                 ErrorMessage = $"錯誤：無法取得取樣檔案清單。{ex.Message}";
             }
+        }
+
+        private async Task<List<string>> LoadFilesAsync(HttpClient client, string endpoint, string primaryField)
+        {
+            var res = await client.GetAsync($"{GetAdminApiBaseUrl()}/{endpoint}");
+            var body = await res.Content.ReadAsStringAsync();
+            if (!res.IsSuccessStatusCode)
+            {
+                if (endpoint == "sampled-files")
+                {
+                    ErrorMessage = $"錯誤：無法取得取樣檔案清單（HTTP {(int)res.StatusCode}）。";
+                }
+
+                return new List<string>();
+            }
+
+            var json = JObject.Parse(body);
+            var files = (json[primaryField] ?? json["files"]) as JArray;
+            if (files == null)
+            {
+                return new List<string>();
+            }
+
+            return files
+                .Select(ExtractFileName)
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Select(x => x!)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(x => x, StringComparer.OrdinalIgnoreCase)
+                .ToList();
         }
 
         private static string? ExtractFileName(JToken? token)
