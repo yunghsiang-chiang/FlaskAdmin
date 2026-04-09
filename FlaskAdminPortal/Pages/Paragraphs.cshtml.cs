@@ -62,6 +62,7 @@ namespace FlaskAdminPortal.Pages
 
                 await LoadSourceFilesAsync(client);
                 await LoadSampledFilesAsync(client);
+                ApplySampledFilesFallback();
 
                 var url = string.IsNullOrWhiteSpace(fileName)
                     ? $"{GetAdminApiBaseUrl()}/paragraphs?page={currentPage}&pageSize={pageSize}"
@@ -183,6 +184,19 @@ namespace FlaskAdminPortal.Pages
                 .Select(ExtractFileName)
                 .Where(x => !string.IsNullOrWhiteSpace(x))
                 .Select(x => x!)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(x => x, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
+
+        private void ApplySampledFilesFallback()
+        {
+            if (SampledFiles.Count > 0 || SourceFiles.Count == 0)
+            {
+                return;
+            }
+
+            SampledFiles = SourceFiles
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .OrderBy(x => x, StringComparer.OrdinalIgnoreCase)
                 .ToList();
