@@ -1,0 +1,162 @@
+@page
+@model FlaskAdminPortal.Pages.SampledFilesModel
+@{
+    ViewData["Title"] = "已取樣檔案清單管理";
+}
+
+<h2>已取樣檔案清單管理</h2>
+<p class="text-muted">此頁面專門管理取樣檔案，讓段落列表畫面更聚焦於段落瀏覽與編輯。</p>
+
+<div class="mb-3">
+    <a class="btn btn-outline-secondary" asp-page="/Paragraphs">返回段落管理</a>
+</div>
+
+@if (!string.IsNullOrEmpty(Model.ErrorMessage))
+{
+    <div class="alert alert-danger">@Model.ErrorMessage</div>
+}
+else
+{
+    <div class="card mb-3">
+        <div class="card-body">
+            <div class="row g-2 align-items-end mb-3">
+                <div class="col-md-6">
+                    <label for="sampled-file-input" class="form-label">新增檔案</label>
+                    <input id="sampled-file-input" type="text" class="form-control" placeholder="請輸入檔名，例如 data.txt" />
+                </div>
+                <div class="col-md-2">
+                    <button type="button" class="btn btn-success" onclick="addSampledFile(event)">新增至取樣清單</button>
+                </div>
+            </div>
+            <ul id="sampled-files-list" class="list-group"></ul>
+        </div>
+    </div>
+
+    <script>
+        const adminApiBase = "/api/admin";
+        const adminApiKey = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.AdminApiKeyForClient));
+        const sampledFiles = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.SampledFiles));
+
+        function buildHeaders(includeContentType = false) {
+            const headers = {};
+            if (includeContentType) {
+                headers['Content-Type'] = 'application/json';
+            }
+            if (adminApiKey) {
+                headers['X-Admin-API-Key'] = adminApiKey;
+            }
+            return headers;
+        }
+
+        function tryParseJson(text) {
+            try {
+                return JSON.parse(text);
+            } catch {
+                return null;
+            }
+        }
+
+        function extractErrorMessage(payload, fallbackText) {
+            if (!payload) return fallbackText;
+            if (typeof payload === "string") return payload;
+            if (payload.message) return payload.message;
+            if (payload.error) return payload.error;
+            if (payload.detail) return payload.detail;
+            return fallbackText;
+        }
+
+        function renderSampledFiles() {
+            const listEl = document.getElementById("sampled-files-list");
+            if (!listEl) return;
+
+            listEl.innerHTML = "";
+            if (sampledFiles.length === 0) {
+                listEl.innerHTML = '<li class="list-group-item text-muted" id="sampled-empty-item">目前沒有已取樣檔案</li>';
+                return;
+            }
+
+            sampledFiles.forEach(file => {
+                const li = document.createElement("li");
+                li.className = "list-group-item d-flex justify-content-between align-items-center";
+
+                const text = document.createElement("span");
+                text.innerText = file;
+
+                const btn = document.createElement("button");
+                btn.type = "button";
+                btn.className = "btn btn-sm btn-outline-danger";
+                btn.innerText = "移除";
+                btn.onclick = (event) => removeSampledFile(file, event);
+
+                li.appendChild(text);
+                li.appendChild(btn);
+                listEl.appendChild(li);
+            });
+        }
+
+        async function addSampledFile(event) {
+            event.preventDefault();
+            const input = document.getElementById("sampled-file-input");
+            const fileName = input?.value?.trim();
+            if (!fileName) {
+                alert("請輸入檔名");
+                return;
+            }
+
+            const res = await fetch(`${adminApiBase}/sampled-files`, {
+                method: 'POST',
+                headers: buildHeaders(true),
+                body: JSON.stringify({ fileName })
+            });
+
+            const bodyText = await res.text();
+            const payload = tryParseJson(bodyText);
+            if (!res.ok) {
+                const msg = extractErrorMessage(payload, bodyText || "未知錯誤");
+                alert(`❌ 新增失敗（HTTP ${res.status}）：${msg}`);
+                return;
+            }
+
+            if (!sampledFiles.some(x => x.toLowerCase() === fileName.toLowerCase())) {
+                sampledFiles.push(fileName);
+                sampledFiles.sort((a, b) => a.localeCompare(b, 'zh-Hant', { sensitivity: 'base' }));
+            }
+
+            input.value = "";
+            renderSampledFiles();
+            alert("✅ 已加入取樣清單");
+        }
+
+        async function removeSampledFile(fileName, event) {
+            event.preventDefault();
+            if (!confirm(`確定要將 ${fileName} 從取樣清單移除嗎？`)) {
+                return;
+            }
+
+            const res = await fetch(`${adminApiBase}/sampled-files/${encodeURIComponent(fileName)}`, {
+                method: 'DELETE',
+                headers: buildHeaders(false)
+            });
+
+            const bodyText = await res.text();
+            const payload = tryParseJson(bodyText);
+            if (!res.ok) {
+                const msg = extractErrorMessage(payload, bodyText || "未知錯誤");
+                alert(`❌ 移除失敗（HTTP ${res.status}）：${msg}`);
+                return;
+            }
+
+            const idx = sampledFiles.findIndex(x => x.toLowerCase() === fileName.toLowerCase());
+            if (idx >= 0) {
+                sampledFiles.splice(idx, 1);
+            }
+
+            renderSampledFiles();
+            alert("✅ 已移除取樣檔案");
+        }
+
+        document.addEventListener("DOMContentLoaded", () => {
+            renderSampledFiles();
+        });
+    </script>
+}

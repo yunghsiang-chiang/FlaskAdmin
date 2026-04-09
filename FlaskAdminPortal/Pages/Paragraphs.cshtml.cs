@@ -35,7 +35,6 @@ namespace FlaskAdminPortal.Pages
 
         public List<ParagraphInfo> Paragraphs { get; set; } = new();
         public List<string> SourceFiles { get; set; } = new();
-        public List<string> SampledFiles { get; set; } = new();
         public string ErrorMessage { get; set; }
         public string SuccessMessage { get; set; }
 
@@ -61,8 +60,6 @@ namespace FlaskAdminPortal.Pages
                 var client = CreateAdminClient();
 
                 await LoadSourceFilesAsync(client);
-                await LoadSampledFilesAsync(client);
-                ApplySampledFilesFallback();
 
                 var url = string.IsNullOrWhiteSpace(fileName)
                     ? $"{GetAdminApiBaseUrl()}/paragraphs?page={currentPage}&pageSize={pageSize}"
@@ -159,44 +156,6 @@ namespace FlaskAdminPortal.Pages
                 .Select(ExtractFileName)
                 .Where(x => !string.IsNullOrWhiteSpace(x))
                 .Select(x => x!)
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .OrderBy(x => x, StringComparer.OrdinalIgnoreCase)
-                .ToList();
-        }
-
-        private async Task LoadSampledFilesAsync(HttpClient client)
-        {
-            var res = await client.GetAsync($"{GetAdminApiBaseUrl()}/sampled-files");
-            var body = await res.Content.ReadAsStringAsync();
-            if (!res.IsSuccessStatusCode)
-            {
-                return;
-            }
-
-            var json = JObject.Parse(body);
-            var files = (json["sampled_files"] ?? json["files"]) as JArray;
-            if (files == null)
-            {
-                return;
-            }
-
-            SampledFiles = files
-                .Select(ExtractFileName)
-                .Where(x => !string.IsNullOrWhiteSpace(x))
-                .Select(x => x!)
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .OrderBy(x => x, StringComparer.OrdinalIgnoreCase)
-                .ToList();
-        }
-
-        private void ApplySampledFilesFallback()
-        {
-            if (SampledFiles.Count > 0 || SourceFiles.Count == 0)
-            {
-                return;
-            }
-
-            SampledFiles = SourceFiles
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .OrderBy(x => x, StringComparer.OrdinalIgnoreCase)
                 .ToList();
